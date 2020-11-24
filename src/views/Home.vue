@@ -1,31 +1,4 @@
 <template>
-  <!-- <div class="container-fluid px-0">
-    <div class="row no-gutters align-items-center justify-content-center">
-      <select v-model="camera">
-        <option value="" disabled>-- Select Device --</option>
-        <option v-for="device in devices" :key="device.deviceId" :value="device.deviceId">{{
-          device.label
-        }}</option>
-      </select>
-    </div>
-    <div class="row no-gutters align-items-center justify-content-center my-3">
-      <button class="btn btn-primary" @click.prevent="onCapture">開始</button>
-    </div>
-    <div class="row no-gutters align-items-center justify-content-center">
-      <vue-web-cam
-        v-if="showCamera"
-        ref="webcam"
-        width="100%"
-        :device-id="deviceId"
-        @started="onStarted"
-        @stopped="onStopped"
-        @error="onError"
-        @cameras="onCameras"
-        @camera-change="onCameraChange"
-      />
-    </div>
-    <img :src="base64" alt="">
-  </div> -->
   <div class="container-fluid px-0">
     <div class="d-flex flex-column align-items-center justify-content-center">
       <div class="p-3 w-100">
@@ -39,8 +12,9 @@
       <div class="p-3" v-if="errorMessage">
         {{ errorMessage }}
       </div>
-      <div class="">
+      <div class="px-3">
         <vue-web-cam
+          ref="webcam"
           :deviceId="deviceId"
           @cameras="onCameras"
           @started="onStarted"
@@ -49,17 +23,33 @@
           @camera-change="onCameraChange"
         />
       </div>
+      <div class="px-3">
+        <button
+          class="btn btn-info"
+          @click.prevent="onCapture"
+          :disabled="!loaded.model || !loaded.camera"
+        >
+          提取
+        </button>
+      </div>
+      <img v-for="(item, index) in base64" :key="index" :src="item" alt="" />
     </div>
   </div>
 </template>
 
 <script>
+import delay from '@/utils/delay';
+import * as faceapi from 'face-api.js';
+
 export default {
   data() {
     return {
       deviceId: '',
       cameras: [],
       errorMessage: '',
+      loaded: { model: false, camera: false },
+      base64: [],
+      float32Array: [],
     };
   },
   methods: {
@@ -69,6 +59,7 @@ export default {
       console.log(cameras); // 1
     },
     onStarted(stream) {
+      this.loaded.camera = true;
       console.log('已開始', stream); // 3
     },
     onStopped(stream) {
@@ -80,60 +71,44 @@ export default {
     onCameraChange(deviceId) {
       console.log(deviceId); // 2
     },
+    async onCapture() {
+      this.base64.push(this.$refs.webcam.capture());
+      await delay(500);
+      this.base64.push(this.$refs.webcam.capture());
+      await delay(500);
+      this.base64.push(this.$refs.webcam.capture());
+      await delay(500);
+      this.base64.push(this.$refs.webcam.capture());
+      await delay(500);
+      this.base64.push(this.$refs.webcam.capture());
+      this.toFloat32Array();
+    },
+    async toFloat32Array() {
+      const vm = this;
+      const cache = await Promise.all(
+        vm.base64.map(async (item) => {
+          const img = document.createElement('img');
+          img.src = item;
+          const { descriptor } = await faceapi
+            .detectSingleFace(img)
+            .withFaceLandmarks()
+            .withFaceDescriptor();
+          return JSON.stringify(descriptor);
+        }),
+      );
+      this.float32Array = cache;
+    },
+    async loadModel() {
+      await Promise.all([
+        faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
+        faceapi.nets.faceRecognitionNet.loadFromUri('/models'),
+        faceapi.nets.ssdMobilenetv1.loadFromUri('/models'),
+      ]);
+      this.loaded.model = true;
+    },
   },
-  // created() {
-  //   setTimeout(() => {
-  //     this.showCamera = true;
-  //   }, 0);
-  // },
-  // data() {
-  //   return {
-  //     base64: '',
-  //     showCamera: false,
-  //     camera: '',
-  //     deviceId: '',
-  //     devices: [],
-  //   };
-  // },
-  // methods: {
-  //   onStarted(stream) {
-  //     console.log('On Started Event', stream);
-  //   },
-  //   onStopped(stream) {
-  //     console.log('On Stopped Event', stream);
-  //   },
-  //   onCameras(cameras) {
-  //     this.devices = cameras;
-  //     console.log('On Cameras Event', cameras);
-  //   },
-  //   onCameraChange(deviceId) {
-  //     this.deviceId = deviceId;
-  //     this.camera = deviceId;
-  //     console.log('On Camera Change Event', deviceId);
-  //   },
-  //   onError(error) {
-  //     console.log('On Error Event', error);
-  //   },
-  //   onCapture() {
-  //     this.base64 = this.$refs.webcam.capture();
-  //     console.log('active');
-  //     // console.log(this.$refs.webcam.capture());
-  //   },
-  // },
-  // watch: {
-  //   camera(id) {
-  //     this.deviceId = id;
-  //   },
-  //   devices() {
-  //     // Once we have a list select the first one
-  //     // console.log(this.devices);
-  //     // eslint-disable-next-line no-unused-vars
-  //     const [first, ...tail] = this.devices;
-  //     if (first) {
-  //       this.camera = first.deviceId;
-  //       this.deviceId = first.deviceId;
-  //     }
-  //   },
-  // },
+  async created() {
+    this.loadModel();
+  },
 };
 </script>
