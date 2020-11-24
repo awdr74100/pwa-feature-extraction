@@ -12,24 +12,26 @@
       <div class="p-3" v-if="errorMessage">
         {{ errorMessage }}
       </div>
-      <div class="px-3">
+      <div class="mx-3 overlay d-flex align-items-center justify-content-center">
         <vue-web-cam
+          id="webcam"
           ref="webcam"
+          width="100%"
+          height="100%"
           :deviceId="deviceId"
           @cameras="onCameras"
           @started="onStarted"
-          @stopped="onStopped"
           @error="onError"
-          @camera-change="onCameraChange"
+          @video-live="onVideoLive"
         />
       </div>
       <div class="px-3">
         <button
-          class="btn btn-info"
+          class="btn btn-info mt-3"
           @click.prevent="onCapture"
           :disabled="!loaded.model || !loaded.camera"
         >
-          提取
+          提取特徵上傳
         </button>
       </div>
       <img v-for="(item, index) in base64" :key="index" :src="item" alt="" />
@@ -53,25 +55,44 @@ export default {
     };
   },
   methods: {
+    async loadModel() {
+      await Promise.all([
+        faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
+        faceapi.nets.faceRecognitionNet.loadFromUri('/models'),
+        faceapi.nets.ssdMobilenetv1.loadFromUri('/models'),
+        faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
+      ]);
+      this.loaded.model = true;
+    },
     onCameras(cameras) {
       this.cameras = cameras;
       this.deviceId = cameras[0].deviceId;
-      console.log(cameras); // 1
     },
-    onStarted(stream) {
+    onStarted() {
       this.loaded.camera = true;
-      console.log('已開始', stream); // 3
-    },
-    onStopped(stream) {
-      console.log('已結束', stream);
     },
     onError(error) {
       this.errorMessage = error;
     },
-    onCameraChange(deviceId) {
-      console.log(deviceId); // 2
+    async onVideoLive() {
+      const webcam = document.querySelector('#webcam');
+      const canvas = faceapi.createCanvasFromMedia(webcam);
+      const canvasSize = { width: webcam.clientWidth, height: webcam.clientHeight };
+      faceapi.matchDimensions(canvas, canvasSize);
+      document.querySelector('.overlay').appendChild(canvas);
+      setInterval(async () => {
+        const detections = await faceapi.detectAllFaces(
+          webcam,
+          new faceapi.TinyFaceDetectorOptions(),
+        );
+        const resizeDetections = faceapi.resizeResults(detections, canvasSize);
+        canvas.getContext('2d').clearRect(0, 0, canvasSize.width, canvasSize.height);
+        faceapi.draw.drawDetections(canvas, resizeDetections);
+      }, 500);
     },
     async onCapture() {
+      this.base64 = [];
+      this.float32Array = [];
       this.base64.push(this.$refs.webcam.capture());
       await delay(500);
       this.base64.push(this.$refs.webcam.capture());
@@ -98,16 +119,8 @@ export default {
       );
       this.float32Array = cache;
     },
-    async loadModel() {
-      await Promise.all([
-        faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
-        faceapi.nets.faceRecognitionNet.loadFromUri('/models'),
-        faceapi.nets.ssdMobilenetv1.loadFromUri('/models'),
-      ]);
-      this.loaded.model = true;
-    },
   },
-  async created() {
+  created() {
     this.loadModel();
   },
 };
