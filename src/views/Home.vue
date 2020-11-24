@@ -1,5 +1,6 @@
 <template>
   <div class="container-fluid px-0">
+    <loading :active="!loaded.model || !loaded.camera" :is-full-page="true"></loading>
     <div class="d-flex flex-column align-items-center justify-content-center">
       <div class="p-3 w-100">
         <select class="form-control" v-model="deviceId">
@@ -34,16 +35,24 @@
           提取特徵上傳
         </button>
       </div>
-      <img v-for="(item, index) in base64" :key="index" :src="item" alt="" />
+      <img v-for="(item, index) in base64" :key="index" :src="item" class="mt-3" alt="" />
     </div>
+    <Modal @callUpload="upload" />
   </div>
 </template>
 
 <script>
-import delay from '@/utils/delay';
+// import delay from '@/utils/delay';
 import * as faceapi from 'face-api.js';
+import $ from 'jquery';
+
+import Modal from '@/components/Modal.vue';
+import { db } from '@/plugins/firebase';
 
 export default {
+  components: {
+    Modal,
+  },
   data() {
     return {
       deviceId: '',
@@ -51,7 +60,7 @@ export default {
       errorMessage: '',
       loaded: { model: false, camera: false },
       base64: [],
-      float32Array: [],
+      float32array: [],
     };
   },
   methods: {
@@ -91,22 +100,23 @@ export default {
       }, 500);
     },
     async onCapture() {
-      this.base64 = [];
-      this.float32Array = [];
-      this.base64.push(this.$refs.webcam.capture());
-      await delay(500);
-      this.base64.push(this.$refs.webcam.capture());
-      await delay(500);
-      this.base64.push(this.$refs.webcam.capture());
-      await delay(500);
-      this.base64.push(this.$refs.webcam.capture());
-      await delay(500);
-      this.base64.push(this.$refs.webcam.capture());
-      this.toFloat32Array();
+      db.ref('/').push('Hello World');
+      // this.base64 = [];
+      // this.float32array = [];
+      // this.base64.push(this.$refs.webcam.capture());
+      // await delay(500);
+      // this.base64.push(this.$refs.webcam.capture());
+      // await delay(500);
+      // this.base64.push(this.$refs.webcam.capture());
+      // await delay(500);
+      // this.base64.push(this.$refs.webcam.capture());
+      // await delay(500);
+      // this.base64.push(this.$refs.webcam.capture());
+      // this.toFloat32Array();
     },
     async toFloat32Array() {
       const vm = this;
-      const cache = await Promise.all(
+      const float32array = await Promise.all(
         vm.base64.map(async (item) => {
           const img = document.createElement('img');
           img.src = item;
@@ -117,7 +127,13 @@ export default {
           return JSON.stringify(descriptor);
         }),
       );
-      this.float32Array = cache;
+      this.float32array = float32array;
+      $('#userData').modal('show');
+    },
+    async upload({ studentId }) {
+      console.log(studentId);
+      console.log(this.float32array);
+      $('#userData').modal('hide');
     },
   },
   created() {
