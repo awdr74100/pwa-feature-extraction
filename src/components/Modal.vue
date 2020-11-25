@@ -39,6 +39,7 @@ export default {
   methods: {
     upload() {
       this.$emit('callUpload', { studentId: this.studentId });
+      this.studentId = '';
     },
   },
 };

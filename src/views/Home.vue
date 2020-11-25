@@ -1,9 +1,10 @@
 <template>
   <div class="container-fluid px-0">
-    <loading
-      :active="!loaded.model || !loaded.camera || loaded.upload"
-      :is-full-page="true"
-    ></loading>
+    <loading :active="isLoading" :is-full-page="true" :opacity="0.7">
+      <slot name="default">
+        <span class="h3"><i class="fas fa-spinner fa-spin text-info"></i></span>
+      </slot>
+    </loading>
     <div class="d-flex flex-column align-items-center justify-content-center">
       <div class="p-3 w-100">
         <select class="form-control" v-model="deviceId">
@@ -13,9 +14,8 @@
           }}</option>
         </select>
       </div>
-      <div class="p-3" v-if="errorMessage">
-        {{ errorMessage }}
-      </div>
+      <div class="p-3 text-danger" v-if="errorMessage">{{ errorMessage }}</div>
+      <div class="p-3 text-danger" v-if="!errorMessage">請在偵測到人臉時進行上傳！</div>
       <div class="mx-3 overlay d-flex align-items-center justify-content-center">
         <vue-web-cam
           id="webcam"
@@ -24,21 +24,16 @@
           height="100%"
           :deviceId="deviceId"
           @cameras="onCameras"
-          @started="onStarted"
           @error="onError"
           @video-live="onVideoLive"
         />
       </div>
       <div class="px-3">
-        <button
-          class="btn btn-info my-3"
-          @click.prevent="onCapture"
-          :disabled="!loaded.model || !loaded.camera"
-        >
+        <button class="btn btn-info my-3" @click.prevent="onCapture" :disabled="isLoading">
           提取特徵上傳
         </button>
       </div>
-      <img v-for="(item, index) in base64" :key="index" :src="item" class="mt-3" alt="" />
+      <!-- <img v-for="(item, index) in base64" :key="index" :src="item" class="mt-3" alt="" /> -->
     </div>
     <Modal @callUpload="upload" />
   </div>
@@ -61,27 +56,24 @@ export default {
       deviceId: '',
       cameras: [],
       errorMessage: '',
-      loaded: { model: false, camera: false, upload: false },
       base64: [],
       float32array: [],
+      isLoading: false,
     };
   },
   methods: {
     async loadModel() {
+      this.isLoading = true;
       await Promise.all([
         faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
         faceapi.nets.faceRecognitionNet.loadFromUri('/models'),
         faceapi.nets.ssdMobilenetv1.loadFromUri('/models'),
         faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
       ]);
-      this.loaded.model = true;
     },
     onCameras(cameras) {
       this.cameras = cameras;
       this.deviceId = cameras[0].deviceId;
-    },
-    onStarted() {
-      this.loaded.camera = true;
     },
     onError(error) {
       this.errorMessage = error;
@@ -92,6 +84,7 @@ export default {
       const canvasSize = { width: webcam.clientWidth, height: webcam.clientHeight };
       faceapi.matchDimensions(canvas, canvasSize);
       document.querySelector('.overlay').appendChild(canvas);
+      this.isLoading = false;
       setInterval(async () => {
         const detections = await faceapi.detectAllFaces(
           webcam,
@@ -99,42 +92,55 @@ export default {
         );
         const resizeDetections = faceapi.resizeResults(detections, canvasSize);
         canvas.getContext('2d').clearRect(0, 0, canvasSize.width, canvasSize.height);
-        faceapi.draw.drawDetections(canvas, resizeDetections);
+        // faceapi.draw.drawDetections(canvas, resizeDetections);
+        resizeDetections.forEach((detection) => {
+          const { score } = detection;
+          new faceapi.draw.DrawBox(
+            {
+              x: detection.box.x,
+              y: detection.box.y,
+              width: detection.box.width,
+              height: detection.box.height,
+            },
+            { boxColor: '#17a2b8' },
+          ).draw(canvas);
+          new faceapi.draw.DrawTextField(
+            [`${Math.ceil(score * 100) / 100}`],
+            detection.box.bottomLeft,
+            { backgroundColor: '#17a2b8' },
+          ).draw(canvas);
+        });
       }, 500);
     },
     async onCapture() {
       this.base64 = [];
       this.float32array = [];
-      this.base64.push(this.$refs.webcam.capture());
-      await delay(500);
-      this.base64.push(this.$refs.webcam.capture());
-      await delay(500);
-      this.base64.push(this.$refs.webcam.capture());
-      await delay(500);
-      this.base64.push(this.$refs.webcam.capture());
-      await delay(500);
-      this.base64.push(this.$refs.webcam.capture());
+      const imageLength = 5;
+      for (let i = 0; i < imageLength; i += 1) {
+        this.base64.push(this.$refs.webcam.capture());
+        // eslint-disable-next-line no-await-in-loop
+        if (i !== imageLength - 1) await delay(500);
+      }
       this.toFloat32Array();
     },
     async toFloat32Array() {
       const vm = this;
-      const float32array = await Promise.all(
-        vm.base64.map(async (item) => {
-          const img = document.createElement('img');
-          img.src = item;
-          try {
-            const { descriptor } = await faceapi
-              .detectSingleFace(img)
-              .withFaceLandmarks()
-              .withFaceDescriptor();
-            return JSON.stringify(descriptor);
-          } catch (error) {
-            this.errorMessage = error;
-            return null;
-          }
-        }),
-      );
-      this.float32array = float32array;
+      const cache = [];
+      vm.base64.forEach((item) => {
+        const img = document.createElement('img');
+        img.src = item;
+        cache.push(
+          faceapi
+            .detectSingleFace(img)
+            .withFaceLandmarks()
+            .withFaceDescriptor(),
+        );
+      });
+      const float32array = await Promise.all(cache);
+      this.float32array = float32array.map((item) => {
+        if (item) return JSON.stringify(item.descriptor);
+        return null;
+      });
       $('#userData').modal('show');
     },
     async upload({ studentId }) {
@@ -143,12 +149,12 @@ export default {
         payload[index] = item;
       });
       try {
-        this.loaded.upload = true;
+        this.isLoading = true;
         await db
           .ref('/members')
           .child(studentId)
           .set(payload);
-        this.loaded.upload = false;
+        this.isLoading = false;
         $('#userData').modal('hide');
       } catch (error) {
         this.errorMessage = error;
