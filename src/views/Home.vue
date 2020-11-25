@@ -80,9 +80,12 @@ export default {
     },
     async onVideoLive() {
       const webcam = document.querySelector('#webcam');
+      const canvasDom = document.querySelector('canvas');
       const canvas = faceapi.createCanvasFromMedia(webcam);
       const canvasSize = { width: webcam.clientWidth, height: webcam.clientHeight };
       faceapi.matchDimensions(canvas, canvasSize);
+      // reset canvas
+      if (canvasDom) document.querySelector('.overlay').removeChild(canvasDom);
       document.querySelector('.overlay').appendChild(canvas);
       this.isLoading = false;
       setInterval(async () => {
