@@ -1,6 +1,9 @@
 <template>
   <div class="container-fluid px-0">
-    <loading :active="!loaded.model || !loaded.camera" :is-full-page="true"></loading>
+    <loading
+      :active="!loaded.model || !loaded.camera || loaded.upload"
+      :is-full-page="true"
+    ></loading>
     <div class="d-flex flex-column align-items-center justify-content-center">
       <div class="p-3 w-100">
         <select class="form-control" v-model="deviceId">
@@ -28,7 +31,7 @@
       </div>
       <div class="px-3">
         <button
-          class="btn btn-info mt-3"
+          class="btn btn-info my-3"
           @click.prevent="onCapture"
           :disabled="!loaded.model || !loaded.camera"
         >
@@ -42,12 +45,12 @@
 </template>
 
 <script>
-// import delay from '@/utils/delay';
+import delay from '@/utils/delay';
 import * as faceapi from 'face-api.js';
 import $ from 'jquery';
 
 import Modal from '@/components/Modal.vue';
-import { db } from '@/plugins/firebase';
+import db from '../db/firebase';
 
 export default {
   components: {
@@ -58,7 +61,7 @@ export default {
       deviceId: '',
       cameras: [],
       errorMessage: '',
-      loaded: { model: false, camera: false },
+      loaded: { model: false, camera: false, upload: false },
       base64: [],
       float32array: [],
     };
@@ -100,19 +103,18 @@ export default {
       }, 500);
     },
     async onCapture() {
-      db.ref('/').push('Hello World');
-      // this.base64 = [];
-      // this.float32array = [];
-      // this.base64.push(this.$refs.webcam.capture());
-      // await delay(500);
-      // this.base64.push(this.$refs.webcam.capture());
-      // await delay(500);
-      // this.base64.push(this.$refs.webcam.capture());
-      // await delay(500);
-      // this.base64.push(this.$refs.webcam.capture());
-      // await delay(500);
-      // this.base64.push(this.$refs.webcam.capture());
-      // this.toFloat32Array();
+      this.base64 = [];
+      this.float32array = [];
+      this.base64.push(this.$refs.webcam.capture());
+      await delay(500);
+      this.base64.push(this.$refs.webcam.capture());
+      await delay(500);
+      this.base64.push(this.$refs.webcam.capture());
+      await delay(500);
+      this.base64.push(this.$refs.webcam.capture());
+      await delay(500);
+      this.base64.push(this.$refs.webcam.capture());
+      this.toFloat32Array();
     },
     async toFloat32Array() {
       const vm = this;
@@ -120,20 +122,37 @@ export default {
         vm.base64.map(async (item) => {
           const img = document.createElement('img');
           img.src = item;
-          const { descriptor } = await faceapi
-            .detectSingleFace(img)
-            .withFaceLandmarks()
-            .withFaceDescriptor();
-          return JSON.stringify(descriptor);
+          try {
+            const { descriptor } = await faceapi
+              .detectSingleFace(img)
+              .withFaceLandmarks()
+              .withFaceDescriptor();
+            return JSON.stringify(descriptor);
+          } catch (error) {
+            this.errorMessage = error;
+            return null;
+          }
         }),
       );
       this.float32array = float32array;
       $('#userData').modal('show');
     },
     async upload({ studentId }) {
-      console.log(studentId);
-      console.log(this.float32array);
-      $('#userData').modal('hide');
+      const payload = {};
+      this.float32array.forEach((item, index) => {
+        payload[index] = item;
+      });
+      try {
+        this.loaded.upload = true;
+        await db
+          .ref('/members')
+          .child(studentId)
+          .set(payload);
+        this.loaded.upload = false;
+        $('#userData').modal('hide');
+      } catch (error) {
+        this.errorMessage = error;
+      }
     },
   },
   created() {
