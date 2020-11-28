@@ -6,7 +6,7 @@
     aria-labelledby="userDataLabel"
     aria-hidden="true"
   >
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
         <div class="modal-header bg-info text-white">
           <h5 class="modal-title" id="userDataLabel">輸入資料</h5>

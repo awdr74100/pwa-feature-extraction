@@ -1,6 +1,6 @@
 <template>
   <div class="container-fluid px-0">
-    <loading :active="isLoading" :is-full-page="true" :opacity="0.7">
+    <loading :active="spinner.fullscreen" :is-full-page="true" :opacity="0.7">
       <slot name="default">
         <span class="h3"><i class="fas fa-spinner fa-spin text-info"></i></span>
       </slot>
@@ -29,8 +29,12 @@
         />
       </div>
       <div class="px-3">
-        <button class="btn btn-info my-3" @click.prevent="onCapture" :disabled="isLoading">
-          提取特徵上傳
+        <button
+          class="btn btn-info my-3 d-flex align-items-center justify-content-center"
+          @click.prevent="onCapture"
+        >
+          <span>特徵提取上傳</span>
+          <i class="fas fa-spinner fa-spin text-white ml-3" v-if="spinner.icon"></i>
         </button>
       </div>
       <!-- <img v-for="(item, index) in base64" :key="index" :src="item" class="mt-3" alt="" /> -->
@@ -58,12 +62,12 @@ export default {
       errorMessage: '',
       base64: [],
       float32array: [],
-      isLoading: false,
+      spinner: { fullscreen: false, icon: false },
     };
   },
   methods: {
     async loadModel() {
-      this.isLoading = true;
+      this.spinner.fullscreen = true;
       await Promise.all([
         faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
         faceapi.nets.faceRecognitionNet.loadFromUri('/models'),
@@ -87,7 +91,7 @@ export default {
       // reset canvas
       if (canvasDom) document.querySelector('.overlay').removeChild(canvasDom);
       document.querySelector('.overlay').appendChild(canvas);
-      this.isLoading = false;
+      this.spinner.fullscreen = false;
       setInterval(async () => {
         const detections = await faceapi.detectAllFaces(
           webcam,
@@ -116,6 +120,7 @@ export default {
       }, 500);
     },
     async onCapture() {
+      this.spinner.icon = true;
       this.base64 = [];
       this.float32array = [];
       const imageLength = 5;
@@ -144,6 +149,7 @@ export default {
         if (item) return JSON.stringify(item.descriptor);
         return null;
       });
+      this.spinner.icon = false;
       $('#userData').modal('show');
     },
     async upload({ studentId }) {
@@ -152,12 +158,12 @@ export default {
         payload[index] = item;
       });
       try {
-        this.isLoading = true;
+        this.spinner.fullscreen = true;
         await db
           .ref('/members')
           .child(studentId)
           .set(payload);
-        this.isLoading = false;
+        this.spinner.fullscreen = false;
         $('#userData').modal('hide');
       } catch (error) {
         this.errorMessage = error;
