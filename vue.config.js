@@ -4,4 +4,9 @@ module.exports = {
     port: 3001,
     disableHostCheck: true,
   },
+  pwa: {
+    workboxOptions: {
+      exclude: [/\.map$/, /_redirects/],
+    },
+  },
 };
