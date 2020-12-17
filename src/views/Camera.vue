@@ -21,6 +21,7 @@
           @cameras="onCameras"
           @camera-change="onCameraChange"
           @error="onError"
+          @notsupported="onError"
           @video-live="onVideoLive"
         />
       </div>
@@ -129,6 +130,7 @@ export default {
     },
     onError(error) {
       this.errorMessage = error;
+      this.$store.commit('ISLOADING', false);
     },
     async loadModels() {
       this.$store.commit('SETLOADINGSTATUS', '模型載入中');
