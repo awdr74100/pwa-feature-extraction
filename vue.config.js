@@ -11,7 +11,7 @@ module.exports = {
     disableHostCheck: true,
   },
   pwa: {
-    name: 'feature-extraction',
+    name: 'Extraction',
     workboxOptions: {
       exclude: [/\.map$/, /_redirects/],
     },
