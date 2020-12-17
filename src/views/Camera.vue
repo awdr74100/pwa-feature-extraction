@@ -1,10 +1,5 @@
 <template>
   <div class="container-fluid px-0">
-    <loading :active="spinner.fullscreen" :is-full-page="true" :opacity="0.7">
-      <slot name="default">
-        <span class="h3"><i class="fas fa-spinner fa-spin text-info"></i></span>
-      </slot>
-    </loading>
     <div class="d-flex flex-column align-items-center justify-content-center">
       <div class="p-3 w-100">
         <select class="form-control" v-model="deviceId">
@@ -34,64 +29,41 @@
           @click.prevent="onCapture"
         >
           <span>特徵提取上傳</span>
-          <i class="fas fa-spinner fa-spin text-white ml-3" v-if="spinner.icon"></i>
+          <i class="fas fa-spinner fa-spin text-white ml-3" v-if="spinner"></i>
         </button>
       </div>
-      <!-- <img v-for="(item, index) in base64" :key="index" :src="item" class="mt-3" alt="" /> -->
     </div>
-    <Modal @callUpload="upload" />
   </div>
 </template>
 
 <script>
 import delay from '@/utils/delay';
 import * as faceapi from 'face-api.js';
-import $ from 'jquery';
-
-import Modal from '@/components/Modal.vue';
-import db from '../db/firebase';
 
 export default {
-  components: {
-    Modal,
-  },
   data() {
     return {
       deviceId: '',
       cameras: [],
       errorMessage: '',
-      base64: [],
-      float32array: [],
-      spinner: { fullscreen: false, icon: false },
+      spinner: false,
     };
   },
   methods: {
-    async loadModel() {
-      this.spinner.fullscreen = true;
-      await Promise.all([
-        faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
-        faceapi.nets.faceRecognitionNet.loadFromUri('/models'),
-        faceapi.nets.ssdMobilenetv1.loadFromUri('/models'),
-        faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
-      ]);
-    },
-    onCameras(cameras) {
-      this.cameras = cameras;
-      this.deviceId = cameras[0].deviceId;
-    },
-    onError(error) {
-      this.errorMessage = error;
-    },
     async onVideoLive() {
+      // load model
+      await this.loadModels();
       const webcam = document.querySelector('#webcam');
       const canvasDom = document.querySelector('canvas');
       const canvas = faceapi.createCanvasFromMedia(webcam);
       const canvasSize = { width: webcam.clientWidth, height: webcam.clientHeight };
       faceapi.matchDimensions(canvas, canvasSize);
-      // reset canvas
+      // clear canvas
       if (canvasDom) document.querySelector('.overlay').removeChild(canvasDom);
       document.querySelector('.overlay').appendChild(canvas);
-      this.spinner.fullscreen = false;
+      // close spinner loading
+      this.$store.commit('ISLOADING', false);
+      // face detection
       setInterval(async () => {
         const detections = await faceapi.detectAllFaces(
           webcam,
@@ -99,7 +71,6 @@ export default {
         );
         const resizeDetections = faceapi.resizeResults(detections, canvasSize);
         canvas.getContext('2d').clearRect(0, 0, canvasSize.width, canvasSize.height);
-        // faceapi.draw.drawDetections(canvas, resizeDetections);
         resizeDetections.forEach((detection) => {
           const { score } = detection;
           new faceapi.draw.DrawBox(
@@ -120,58 +91,53 @@ export default {
       }, 500);
     },
     async onCapture() {
-      this.spinner.icon = true;
-      this.base64 = [];
-      this.float32array = [];
+      const vm = this;
+      const base64Array = [];
       const imageLength = 5;
+      vm.$store.commit('SETFEATURES', []);
+      this.spinner = true;
       for (let i = 0; i < imageLength; i += 1) {
-        this.base64.push(this.$refs.webcam.capture());
+        base64Array.push(vm.$refs.webcam.capture());
         // eslint-disable-next-line no-await-in-loop
         if (i !== imageLength - 1) await delay(500);
       }
-      this.toFloat32Array();
-    },
-    async toFloat32Array() {
-      const vm = this;
-      const cache = [];
-      vm.base64.forEach((item) => {
-        const img = document.createElement('img');
-        img.src = item;
-        cache.push(
-          faceapi
+      const features = await Promise.all(
+        base64Array.map((base64) => {
+          const img = document.createElement('img');
+          img.src = base64;
+          return faceapi
             .detectSingleFace(img)
             .withFaceLandmarks()
-            .withFaceDescriptor(),
-        );
-      });
-      const float32array = await Promise.all(cache);
-      this.float32array = float32array.map((item) => {
+            .withFaceDescriptor();
+        }),
+      );
+      const featuresStringify = features.map((item) => {
         if (item) return JSON.stringify(item.descriptor);
         return null;
       });
-      this.spinner.icon = false;
-      $('#userData').modal('show');
+      this.$store.commit('SETFEATURES', featuresStringify);
+      this.spinner = false;
+      this.$store.commit('SHOWMODAL', true);
     },
-    async upload({ studentId }) {
-      const payload = {};
-      this.float32array.forEach((item, index) => {
-        payload[index] = item;
-      });
-      try {
-        this.spinner.fullscreen = true;
-        await db
-          .ref('/members')
-          .child(studentId)
-          .set(payload);
-        this.spinner.fullscreen = false;
-        $('#userData').modal('hide');
-      } catch (error) {
-        this.errorMessage = error;
-      }
+    onCameras(cameras) {
+      this.cameras = cameras;
+      this.deviceId = cameras[0].deviceId;
+    },
+    onError(error) {
+      this.errorMessage = error;
+    },
+    async loadModels() {
+      return Promise.all([
+        faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
+        faceapi.nets.faceRecognitionNet.loadFromUri('/models'),
+        faceapi.nets.ssdMobilenetv1.loadFromUri('/models'),
+        faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
+      ]);
     },
   },
   created() {
-    this.loadModel();
+    // open spinner loading
+    this.$store.commit('ISLOADING', true);
   },
 };
 </script>

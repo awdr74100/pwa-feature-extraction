@@ -1,5 +1,5 @@
 {
-  "name": "face-recognition-pwa",
+  "name": "feature-extraction",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -17,7 +17,8 @@
     "vue": "^2.6.11",
     "vue-loading-overlay": "^3.4.2",
     "vue-router": "^3.2.0",
-    "vue-web-cam": "^1.9.0"
+    "vue-web-cam": "^1.9.0",
+    "vuex": "^3.6.0"
   },
   "devDependencies": {
     "@vue/cli-plugin-babel": "~4.5.0",
