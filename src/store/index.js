@@ -9,7 +9,7 @@ export default new Vuex.Store({
   state: {
     isSignIn: false,
     isLoading: false,
-    loadingStatus: '模型載入中',
+    loadingStatus: '',
     showModal: false,
     user: {
       uid: '',
