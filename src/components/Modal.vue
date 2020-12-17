@@ -10,7 +10,7 @@
   >
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
-        <div class="modal-header bg-info text-white">
+        <div class="modal-header bg-teal text-white">
           <h5 class="modal-title" id="userDataLabel">輸入資料</h5>
           <button
             type="button"
@@ -39,13 +39,13 @@
         <div class="modal-footer">
           <button
             type="button"
-            class="btn btn-secondary"
+            class="btn btn-outline-secondary"
             data-dismiss="modal"
             @click.prevent="closeModal"
           >
             取消
           </button>
-          <button type="button" class="btn btn-info" @click.prevent="upload">確定</button>
+          <button type="button" class="btn btn-outline-teal" @click.prevent="upload">確定</button>
         </div>
       </div>
     </div>
@@ -54,7 +54,6 @@
 
 <script>
 import { mapState } from 'vuex';
-import $ from 'jquery';
 import { db } from '@/db/firebase';
 
 export default {
@@ -68,6 +67,7 @@ export default {
         payload[index] = item;
       });
       try {
+        this.$store.commit('SETLOADINGSTATUS', '特徵上傳中');
         this.$store.commit('ISLOADING', true);
         await db
           .ref('/users')
@@ -77,6 +77,7 @@ export default {
             email: this.user.email,
             features: payload,
           });
+        this.$store.commit('SETLOADINGSTATUS', '');
         this.$store.commit('SHOWMODAL', false);
         this.$store.commit('ISLOADING', false);
       } catch (error) {
@@ -85,13 +86,7 @@ export default {
     },
   },
   computed: {
-    ...mapState(['user', 'showModal', 'features']),
-  },
-  watch: {
-    showModal(bool) {
-      const status = bool ? 'show' : 'hide';
-      $('#userData').modal(status);
-    },
+    ...mapState(['user', 'features']),
   },
 };
 </script>

@@ -1,5 +1,6 @@
 import Vue from 'vue';
 import Vuex from 'vuex';
+import $ from 'jquery';
 
 Vue.use(Vuex);
 
@@ -8,6 +9,7 @@ export default new Vuex.Store({
   state: {
     isSignIn: false,
     isLoading: false,
+    loadingStatus: '模型載入中',
     showModal: false,
     user: {
       uid: '',
@@ -34,6 +36,10 @@ export default new Vuex.Store({
     },
     SHOWMODAL(state, status) {
       state.showModal = status;
+      $('#userData').modal(status ? 'show' : 'hide');
+    },
+    SETLOADINGSTATUS(state, status) {
+      state.loadingStatus = status;
     },
   },
   getters: {},

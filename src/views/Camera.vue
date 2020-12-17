@@ -19,16 +19,17 @@
           height="100%"
           :deviceId="deviceId"
           @cameras="onCameras"
+          @camera-change="onCameraChange"
           @error="onError"
           @video-live="onVideoLive"
         />
       </div>
       <div class="px-3">
         <button
-          class="btn btn-info my-3 d-flex align-items-center justify-content-center"
+          class="btn btn-teal my-3 d-flex align-items-center justify-content-center"
           @click.prevent="onCapture"
         >
-          <span>特徵提取上傳</span>
+          <span>提取特徵</span>
           <i class="fas fa-spinner fa-spin text-white ml-3" v-if="spinner"></i>
         </button>
       </div>
@@ -47,12 +48,13 @@ export default {
       cameras: [],
       errorMessage: '',
       spinner: false,
+      loadedModels: false,
     };
   },
   methods: {
     async onVideoLive() {
       // load model
-      await this.loadModels();
+      if (!this.loadedModels) await this.loadModels();
       const webcam = document.querySelector('#webcam');
       const canvasDom = document.querySelector('canvas');
       const canvas = faceapi.createCanvasFromMedia(webcam);
@@ -72,7 +74,7 @@ export default {
         const resizeDetections = faceapi.resizeResults(detections, canvasSize);
         canvas.getContext('2d').clearRect(0, 0, canvasSize.width, canvasSize.height);
         resizeDetections.forEach((detection) => {
-          const { score } = detection;
+          const score = Math.ceil(detection.score * 100) / 100;
           new faceapi.draw.DrawBox(
             {
               x: detection.box.x,
@@ -80,13 +82,11 @@ export default {
               width: detection.box.width,
               height: detection.box.height,
             },
-            { boxColor: '#17a2b8' },
+            { boxColor: score > 0.85 ? '#20c997' : '#6c757d' },
           ).draw(canvas);
-          new faceapi.draw.DrawTextField(
-            [`${Math.ceil(score * 100) / 100}`],
-            detection.box.bottomLeft,
-            { backgroundColor: '#17a2b8' },
-          ).draw(canvas);
+          new faceapi.draw.DrawTextField([`${score}`], detection.box.bottomLeft, {
+            backgroundColor: score > 0.85 ? '#20c997' : '#6c757d',
+          }).draw(canvas);
         });
       }, 500);
     },
@@ -95,7 +95,7 @@ export default {
       const base64Array = [];
       const imageLength = 5;
       vm.$store.commit('SETFEATURES', []);
-      this.spinner = true;
+      vm.spinner = true;
       for (let i = 0; i < imageLength; i += 1) {
         base64Array.push(vm.$refs.webcam.capture());
         // eslint-disable-next-line no-await-in-loop
@@ -115,28 +115,35 @@ export default {
         if (item) return JSON.stringify(item.descriptor);
         return null;
       });
-      this.$store.commit('SETFEATURES', featuresStringify);
-      this.spinner = false;
-      this.$store.commit('SHOWMODAL', true);
+      vm.$store.commit('SETFEATURES', featuresStringify);
+      vm.spinner = false;
+      vm.$store.commit('SHOWMODAL', true);
     },
     onCameras(cameras) {
       this.cameras = cameras;
       this.deviceId = cameras[0].deviceId;
     },
+    onCameraChange() {
+      this.$store.commit('SETLOADINGSTATUS', '相機啟動中');
+      this.$store.commit('ISLOADING', true);
+    },
     onError(error) {
       this.errorMessage = error;
     },
     async loadModels() {
-      return Promise.all([
+      this.$store.commit('SETLOADINGSTATUS', '模型載入中');
+      await Promise.all([
         faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
         faceapi.nets.faceRecognitionNet.loadFromUri('/models'),
         faceapi.nets.ssdMobilenetv1.loadFromUri('/models'),
         faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
       ]);
+      this.loadedModels = true;
+      return Promise.resolve();
     },
   },
   created() {
-    // open spinner loading
+    this.$store.commit('SETLOADINGSTATUS', '相機啟動中');
     this.$store.commit('ISLOADING', true);
   },
 };
