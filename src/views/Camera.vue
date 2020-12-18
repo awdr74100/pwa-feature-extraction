@@ -10,7 +10,7 @@
         </select>
       </div>
       <div class="p-3 text-danger" v-if="errorMessage">{{ errorMessage }}</div>
-      <div class="p-3 text-danger" v-if="!errorMessage">請在偵測到人臉時進行上傳！</div>
+      <div class="p-3 text-danger" v-if="!errorMessage">請在人臉檢測框為綠色時進行提取！</div>
       <div class="mx-3 overlay d-flex align-items-center justify-content-center">
         <vue-web-cam
           id="webcam"
