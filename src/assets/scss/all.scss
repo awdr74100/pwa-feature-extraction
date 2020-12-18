@@ -1,5 +1,7 @@
 @import '~bootstrap/scss/functions';
-@import './helpers/variables';
+@import '~bootstrap/scss/variables';
+@import './helpers/custom';
+@import '~bootstrap/scss/mixins';
 @import '~bootstrap/scss/bootstrap';
 
 .overlay {
