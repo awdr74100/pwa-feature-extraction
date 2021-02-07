@@ -11,6 +11,8 @@
 
 ## 線上演示
 
+> IOS 須使用 Safari 開啟，Android 則是 Chrome 開啟
+
 - Extraction (Client)：https://pwa-feature-extraction.netlify.app/
 - Recognition (Client)：https://pwa-face-recognition.netlify.app/
 - Recognition (Repo)：https://github.com/awdr74100/pwa-face-recognition
